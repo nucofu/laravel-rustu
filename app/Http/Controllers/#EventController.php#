@@ -1,0 +1,86 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Event;
+use App\Models\Admin;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+
+class EventController extends Controller
+{
+    public function index()
+    {
+        $events = Event::with('admin')->latest()->get();
+        return view('admin.pages.event.index', compact('events'));
+    }
+
+    public function create()
+    {
+        $admins = Admin::all();
+        return view('admin.pages.event.create', compact('admins'));
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'judul_event' => 'required|string|max:255',
+            'deskripsi' => 'required|string',
+            'tanggal_mulai' => 'required|date',
+            'tanggal_selesai' => 'required|date|after_or_equal:tanggal_mulai',
+            'lokasi' => 'required|string|max:255',
+            'gambar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'admin_id' => 'required|exists:admins,id'
+        ]);
+
+        $data = $request->all();
+
+        if ($request->hasFile('gambar')) {
+            $data['gambar'] = $request->file('gambar')->store('events', 'public');
+        }
+
+        Event::create($data);
+        return redirect()->route('event.index')->with('success', 'Event berhasil ditambahkan.');
+    }
+
+    public function edit($id)
+    {
+        $event = Event::findOrFail($id);
+        $admins = Admin::all();
+        return view('admin.pages.event.edit', compact('event', 'admins'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $event = Event::findOrFail($id);
+
+        $request->validate([
+            'judul_event' => 'required|string|max:255',
+            'deskripsi' => 'required|string',
+            'tanggal_mulai' => 'required|date',
+            'tanggal_selesai' => 'required|date|after_or_equal:tanggal_mulai',
+            'lokasi' => 'required|string|max:255',
+            'gambar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'id' => 'required|exists:admins,id'
+        ]);
+
+        $data = $request->all();
+
+        if ($request->hasFile('gambar')) {
+            if ($event->gambar) Storage::disk('public')->delete($event->gambar);
+            $data['gambar'] = $request->file('gambar')->store('events', 'public');
+        }
+
+        $event->update($data);
+        return redirect()->route('event.index')->with('success', 'Event berhasil diperbarui.');
+    }
+
+    public function destroy($id)
+    {
+        $event = Event::findOrFail($id);
+        if ($event->gambar) Storage::disk('public')->delete($event->gambar);
+        $event->delete();
+        
+        return redirect()->route('event.index')->with('success', 'Event berhasil dihapus.');
+    }
+}
